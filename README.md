@@ -23,6 +23,8 @@ pip install git+https://github.com/FumiYoshida/chatgptmanager
 ## Usage
 
 ```python
+from chatgptmanager import Chat
+
 chat = Chat(api_key="YOUR_OPENAI_API_KEY")
 response, price = chat("Hello, how are you?")
 print(response)  # モデルの返答を表示
