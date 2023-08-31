@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatgptmanager"
+description = "handling openai api"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.9.0"
+dependencies = [
+    "numpy",
+    "pandas",
+    "openai",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "flake8",
+    "mypy",
+    "black",
+    "isort"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.dynamic]
+version = {attr = "version.version"}
+
+[tool.setuptools_scm]
+write_to = "src/version.py"
+version_scheme = "python-simplified-semver"
+local_scheme = "no-local-version"
+
+[tools.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+
+[tools.flake8]
+max-line-length = 100
