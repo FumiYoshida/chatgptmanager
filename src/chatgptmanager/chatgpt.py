@@ -9,7 +9,7 @@ import pandas as pd
 
 class Chat:
     def __init__(self, api_key, model_name="gpt-3.5-turbo", embedding_model_name="text-embedding-ada-002",
-                 interactive=True):
+                 interactive=True, auto_saveload=True):
         """
         Chat クラスの初期化.
 
@@ -57,6 +57,10 @@ class Chat:
         
         # 連続した会話を行うか(過去の会話の履歴を持つか)
         self.interactive = interactive
+        
+        self.auto_saveload = auto_saveload
+        if self.auto_saveload:
+            self.load()
         
     def reset(self):
         """
@@ -139,6 +143,13 @@ class Chat:
             input_tokens = len(message),
             output_tokens = len(message) * 1.1 + 20,
         )
+    
+    def summarize_and_clear_history(self):
+        # あまり会話が長くなると1回あたりの料金が高くなるため、会話履歴を要約する
+        self('今までの会話を要約してください。')
+        
+        # 会話履歴を「今までの会話を要約してください」「(ChatGPTの返答)」のみにする
+        self.chat_history = self.chat_history[-2:]
         
     def __call__(self, message, temperature=0, temporary_interactive=False):
         """
@@ -160,6 +171,7 @@ class Chat:
         float
             利用料金(ドル).
         """
+        message = str(message)
         if temporary_interactive:
             saved_param = {"interactive": self.interactive}
             self.interactive = True
@@ -179,16 +191,17 @@ class Chat:
                 return res, price
             
         # チャットで呼び出す
-        self.chat_history.append({'role': 'user', 'content': message})
+        my_message = {'role': 'user', 'content': message}
         
         completion = openai.ChatCompletion.create(
           model = self.model_name,
-          messages = self.chat_history,
+          messages = self.chat_history + [my_message],
           temperature = temperature,
         )
         
         # 返答を取得
         res = completion["choices"][0]["message"]["content"]
+        self.chat_history.append(my_message) # atomicな操作にするため、送信&返答が終わってから追加する
         self.chat_history.append({'role': 'assistant', 'content': res})
         
         if (len(self.chat_history) == 2) and (temperature == 0):
@@ -205,6 +218,10 @@ class Chat:
         
         if temporary_interactive:
             self.interactive = saved_param["interactive"]
+            
+        if self.auto_saveload:
+            self.save()
+            
         return res, price
     
     def embedding(self, query):
