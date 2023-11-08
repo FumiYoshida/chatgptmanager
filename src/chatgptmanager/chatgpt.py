@@ -76,7 +76,7 @@ class Chat:
         """
         キャッシュを保存する.
         """
-        path = self.savedir / f"{pd.Timestamp('now').strftime('%Y%m%d%H%M%S')}.pkl"
+        path = self.savedir / f"{pd.Timestamp('now').strftime('%Y%m%d')}.pkl"
         with open(path, "wb") as f:
             pickle.dump(self.cache, f)
             
