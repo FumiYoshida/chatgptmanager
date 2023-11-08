@@ -41,7 +41,7 @@ class Chat:
             "gpt-4-1106-preview": {
                 "input": 1.0e-5,
                 "output": 3.0e-5,
-            }
+            },
             "text-embedding-ada-002": {
                 "input": 1.0e-7,
             },
