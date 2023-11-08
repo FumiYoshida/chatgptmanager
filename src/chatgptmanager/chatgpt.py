@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 class Chat:
-    def __init__(self, api_key, model_name="gpt-3.5-turbo", embedding_model_name="text-embedding-ada-002",
+    def __init__(self, api_key, model_name="gpt-4-1106-preview", embedding_model_name="text-embedding-ada-002",
                  interactive=True, auto_saveload=True):
         """
         Chat クラスの初期化.
@@ -18,7 +18,7 @@ class Chat:
         api_key : str
             OpenAI APIのキー.
         model_name : str, optional
-            使用するOpenAIモデルの名前. Default is "gpt-3.5-turbo".
+            使用するOpenAIモデルの名前. Default is "gpt-4-1106-preview".
         embedding_model_name : str, optional
             使用する埋め込みモデルの名前. Default is "text-embedding-ada-002".
         interactive : bool, optional
@@ -38,9 +38,13 @@ class Chat:
                 "input": 3.0e-5,
                 "output": 6.0e-5,
             },
+            "gpt-4-1106-preview": {
+                "input": 1.0e-5,
+                "output": 3.0e-5,
+            }
             "text-embedding-ada-002": {
                 "input": 1.0e-7,
-            }
+            },
         }
         
         # 実際に使った分の料金
