@@ -42,6 +42,9 @@ class Chat:
             "text-embedding-3-small": {
                 "input": 2.0e-8,
             },
+            "text-embedding-3-large": {
+                "input": 1.3e-7,
+            }
         }
 
         # 実際に使った分の料金
