@@ -3,12 +3,13 @@ from pathlib import Path
 import pickle
 from collections.abc import Iterable
 
-import openai
+from openai import OpenAI
+
 import numpy as np
 import pandas as pd
 
 class Chat:
-    def __init__(self, api_key, model_name="gpt-4-1106-preview", embedding_model_name="text-embedding-ada-002",
+    def __init__(self, api_key, model_name="gpt-4o-mini", embedding_model_name="text-embedding-3-small",
                  interactive=True, auto_saveload=True):
         """
         Chat クラスの初期化.
@@ -20,58 +21,54 @@ class Chat:
         model_name : str, optional
             使用するOpenAIモデルの名前. Default is "gpt-4-1106-preview".
         embedding_model_name : str, optional
-            使用する埋め込みモデルの名前. Default is "text-embedding-ada-002".
+            使用する埋め込みモデルの名前. Default is "text-embedding-3-small".
         interactive : bool, optional
             連続した会話を行うか(過去の会話の履歴を持つか). Default is True.
         """
-        self.api_key = openai.api_key = api_key
+        self.client = OpenAI(api_key=api_key)
         self.model_name = model_name
         self.embedding_model_name = embedding_model_name
-        
+
         # トークンあたりの価格データ
         self.pricing_data = {
-            "gpt-3.5-turbo": {
-                "input": 1.5e-6,
-                "output": 2.0e-6,
+            "gpt-4o-mini": {
+                "input": 1.5e-7,
+                "output": 6.0e-7,
             },
-            "gpt-4": {
-                "input": 3.0e-5,
-                "output": 6.0e-5,
+            "gpt-4o-2024-08-06": {
+                "input": 2.5e-6,
+                "output": 1.0e-5,
             },
-            "gpt-4-1106-preview": {
-                "input": 1.0e-5,
-                "output": 3.0e-5,
-            },
-            "text-embedding-ada-002": {
-                "input": 1.0e-7,
+            "text-embedding-3-small": {
+                "input": 2.0e-8,
             },
         }
-        
+
         # 実際に使った分の料金
         self.fee = 0
-        
+
         # 返答のキャッシュ
         self.cache = {}
-        
+
         self.savedir = Path("./chatgpt/")
         self.savedir.mkdir(exist_ok=True)
-        
+
         # 会話履歴
         self.chat_history = []
-        
+
         # 連続した会話を行うか(過去の会話の履歴を持つか)
         self.interactive = interactive
-        
+
         self.auto_saveload = auto_saveload
         if self.auto_saveload:
             self.load()
-        
+
     def reset(self):
         """
         会話履歴をリセットする.
         """
         self.chat_history = []
-        
+
     def save(self):
         """
         キャッシュを保存する.
@@ -79,7 +76,7 @@ class Chat:
         path = self.savedir / f"{pd.Timestamp('now').strftime('%Y%m%d')}.pkl"
         with open(path, "wb") as f:
             pickle.dump(self.cache, f)
-            
+
     def load(self, path=None):
         """
         キャッシュをロードする.
@@ -109,7 +106,7 @@ class Chat:
         """
         speech_strs = [f"> {speech['role']}: \n{speech['content']}" for speech in self.chat_history]
         return '\n\n'.join(speech_strs)
-                
+
     def calculate_price(self, input_tokens, output_tokens):
         """
         現在のモデルでの利用料金(ドル)を返す.
@@ -128,7 +125,7 @@ class Chat:
         """
         pricing = self.pricing_data[self.model_name]
         return pricing["input"] * input_tokens + pricing["output"] * output_tokens
-        
+
     def estimate_price(self, message):
         """
         messageを送った際の料金(ドル)の目安を返す.
@@ -147,14 +144,14 @@ class Chat:
             input_tokens = len(message),
             output_tokens = len(message) * 1.1 + 20,
         )
-    
+
     def summarize_and_clear_history(self):
         # あまり会話が長くなると1回あたりの料金が高くなるため、会話履歴を要約する
         self('今までの会話を要約してください。')
-        
+
         # 会話履歴を「今までの会話を要約してください」「(ChatGPTの返答)」のみにする
         self.chat_history = self.chat_history[-2:]
-        
+
     def __call__(self, message, temperature=0, temporary_interactive=False):
         """
         モデルを使用して会話を行う.
@@ -179,11 +176,11 @@ class Chat:
         if temporary_interactive:
             saved_param = {"interactive": self.interactive}
             self.interactive = True
-            
+
         if not self.interactive:
             # 連続して会話を行わない場合 会話の履歴を消去する
             self.chat_history = []
-        
+
         if (not self.chat_history) and (temperature == 0):
             # messageが同じなら同じ返答をする設定の場合
             key = (self.model_name, message)
@@ -193,41 +190,39 @@ class Chat:
                 self.chat_history.append({'role': 'assistant', 'content': res})
                 price = 0
                 return res, price
-            
+
         # チャットで呼び出す
         my_message = {'role': 'user', 'content': message}
-        
-        completion = openai.ChatCompletion.create(
-          model = self.model_name,
-          messages = self.chat_history + [my_message],
-          temperature = temperature,
-        )
-        
+
+        completion = self.client.chat.completions.create(model = self.model_name,
+        messages = self.chat_history + [my_message],
+        temperature = temperature)
+
         # 返答を取得
-        res = completion["choices"][0]["message"]["content"]
+        res = completion.choices[0].message.content
         self.chat_history.append(my_message) # atomicな操作にするため、送信&返答が終わってから追加する
         self.chat_history.append({'role': 'assistant', 'content': res})
-        
+
         if (len(self.chat_history) == 2) and (temperature == 0):
             # 一問一答形式かつmessageが同じなら同じ返答をする設定の場合
             # 返答を保存する
             self.cache[(self.model_name, message)] = res
-        
+
         # 料金を計算
         price = self.calculate_price(
-            input_tokens = completion["usage"]["prompt_tokens"],
-            output_tokens = completion["usage"]["completion_tokens"],
+            input_tokens = completion.usage.prompt_tokens,
+            output_tokens = completion.usage.completion_tokens,
         )
         self.fee += price
-        
+
         if temporary_interactive:
             self.interactive = saved_param["interactive"]
-            
+
         if self.auto_saveload:
             self.save()
-            
+
         return res, price
-    
+
     def embedding(self, query):
         """
         指定されたクエリの埋め込みベクトルを取得する.
@@ -249,19 +244,16 @@ class Chat:
         else:
             multiple_query = False
             inputs = [str(query).replace("\n", " ")]
-            
-        res = openai.Embedding.create(
+
+        res = self.client.embeddings.create(
             input = inputs, 
-            model = self.embedding_model_name
+            model = self.embedding_model_name,
         )
-        price = res["usage"]["total_tokens"] * self.pricing_data[self.embedding_model_name]["input"]
-        vecs = np.array([data["embedding"] for data in res["data"]])
+        price = res.usage.total_tokens * self.pricing_data[self.embedding_model_name]["input"]
+        vecs = np.array([data.embedding for data in res.data])
         self.fee += price
-        
+
         if multiple_query:
             return vecs, price
         else:
             return vecs[0], price
-        
-        
-        
